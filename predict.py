@@ -134,7 +134,7 @@ class SVM(StatModel):
 class CardPredictor:
 	def __init__(self):
 		#车牌识别的部分参数保存在js中，便于根据图片分辨率做调整
-		f = open('config.js')
+		f = open('config.json')
 		j = json.load(f)
 		for c in j["config"]:
 			if c["open"]:
