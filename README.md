@@ -17,3 +17,6 @@ License Plate Recognition For Car With Python And OpenCV
 
 1. 对于不同车距，车牌的大小不一，所以这里统一处理的时候针对medium和difficult有着不同的resize大小(medium的车牌比difficult车牌面积大)
 2. 对于不同车距，车牌的清晰度不一，所以这里检测边缘的时候对于模糊边缘(difficult)只检测一个方向，对于较清晰边缘(medium)检测了两个方向
+
+- [ ] de一下颜色定位的bug，目前在difficult的几张图片的hsv映射有问题；
+- [ ] 对定位好的车牌进行resize后训练识别车牌上的字符、数字的网络模型；
