@@ -19,7 +19,7 @@ PROVINCE_START = 1000
 
 svm_params = dict(kernel_type=cv2.ml.SVM_LINEAR,
                   svm_type=cv2.ml.SVM_C_SVC,
-                  C=2.67, gamma=5.383)
+                  C=3, gamma=8)
 
 
 def imreadex(filename):
@@ -194,6 +194,7 @@ class CardPredictor:
 
             chars_train = list(map(deskew, chars_train))
             chars_train = preprocess_hog(chars_train)
+            # print(chars_train.shape)
             # chars_train = chars_train.reshape(-1, 20, 20).astype(np.float32)
             chars_label = np.array(chars_label)
             self.model.train(chars_train, chars_label)
@@ -689,23 +690,23 @@ if __name__ == "__main__":
     # carpredictor_easy.locate('./images/easy/1-1.jpg')
     # carpredictor_easy.locate('./images/easy/1-2.jpg')
     # carpredictor_easy.locate('./images/easy/1-3.jpg')
-    # carpredictor_medium.locate('./images/medium/2-1.jpg')
+    carpredictor_medium.locate('./images/medium/2-1.jpg')
     # carpredictor_medium.locate('./images/medium/2-2.jpg')
     # carpredictor_medium.locate('./images/medium/2-3.jpg')
     # carpredictor_difficult.locate('./images/difficult/3-1.jpg')
     # carpredictor_difficult.locate('./images/difficult/3-2.jpg')
-    carpredictor_difficult.locate('./images/difficult/3-3.jpg')
+    # carpredictor_difficult.locate('./images/difficult/3-3.jpg')
     # carpredictor.locate('./test/car4.jpg')
 
     # split test
     # carpredictor_easy.split()
-    # carpredictor_medium.split()
-    carpredictor_difficult.split()
+    carpredictor_medium.split()
+    # carpredictor_difficult.split()
 
     # recognize test
     # carpredictor_easy.recognize()
-    # carpredictor_medium.recognize()
-    carpredictor_difficult.recognize()
+    carpredictor_medium.recognize()
+    # carpredictor_difficult.recognize()
     while True:
         k = cv2.waitKey(1)
         if k == ord('q'):
