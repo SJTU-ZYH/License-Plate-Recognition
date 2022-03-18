@@ -1,3 +1,5 @@
+import time
+
 import cv2
 import numpy as np
 from numpy.linalg import norm
@@ -19,7 +21,7 @@ PROVINCE_START = 1000
 
 svm_params = dict(kernel_type=cv2.ml.SVM_LINEAR,
                   svm_type=cv2.ml.SVM_C_SVC,
-                  C=3, gamma=8)
+                  C=6, gamma=10) # C=3, gamma=8
 
 
 def imreadex(filename):
@@ -35,11 +37,11 @@ def point_limit(point):
 
 #根据设定的阈值和图片直方图，找出波峰，用于分隔字符
 def find_waves(threshold, histogram):
-    print("histogram size: " + str(histogram.size))
+    # print("histogram size: " + str(histogram.size))
     up_point = -1#上升点
     is_peak = False
     if histogram[0] > threshold:
-        print("yes")
+        # print("yes")
         up_point = 0
         is_peak = True
     wave_peaks = []
@@ -56,7 +58,7 @@ def find_waves(threshold, histogram):
     if is_peak and up_point != -1 and i - up_point > 4:
         # print("yes")
         wave_peaks.append((up_point, i))
-    print("wave_peaks:", wave_peaks)
+    # print("wave_peaks:", wave_peaks)
     return wave_peaks
 
 
@@ -88,6 +90,7 @@ def preprocess_hog(digits):
         mag, ang = cv2.cartToPolar(gx, gy)
         bin_n = 16
         bin = np.int32(bin_n * ang / (2 * np.pi))
+        # print(bin.shape)
         bin_cells = bin[:10, :10], bin[10:, :10], bin[:10, 10:], bin[10:, 10:]
         mag_cells = mag[:10, :10], mag[10:, :10], mag[:10, 10:], mag[10:, 10:]
         hists = [np.bincount(b.ravel(), m.ravel(), bin_n) for b, m in zip(bin_cells, mag_cells)]
@@ -98,7 +101,7 @@ def preprocess_hog(digits):
         hist /= hist.sum() + eps
         hist = np.sqrt(hist)
         hist /= norm(hist) + eps
-
+        # print("hist:", type(hist), '\n', hist.shape, hist)
         samples.append(hist)
     return np.float32(samples)
 
@@ -219,7 +222,7 @@ class CardPredictor:
             chars_train = preprocess_hog(chars_train)
             # chars_train = chars_train.reshape(-1, 20, 20).astype(np.float32)
             chars_label = np.array(chars_label)
-            print(chars_train.shape)
+            # print(chars_train.shape)
             self.modelchinese.train(chars_train, chars_label)
 
     def save_traindata(self):
@@ -231,7 +234,7 @@ class CardPredictor:
 
     def accurate_place(self, card_img_hsv, Hlimit1, Hlimit2, Smin, color):
         row_num, col_num = card_img_hsv.shape[:2]
-        print("row, col num:", row_num, col_num)
+        # print("row, col num:", row_num, col_num)
         xl = col_num
         xr = 0
         yh = 0
@@ -275,18 +278,21 @@ class CardPredictor:
         return xl, xr, yh+2, yl-2
 
     def locate(self, car_pic, resize_rate=1):
+        self.card_imgs = []
+        self.colors = []
+        t0 = time.time()
         print('---------------------------------------------')
         print('对图片', car_pic, '的车牌定位')
         if type(car_pic) == type(""):
             img = imreadex(car_pic)
         else:
             img = car_pic
+        # print('time_use_read:', time.time() - t0)
         if self.type == 1:
             img = img[int(img.shape[0] * 2 / 5): img.shape[0]]
             pic_hight, pic_width = img.shape[:2]
         else:
             pic_hight, pic_width = img.shape[:2]
-
         if pic_width > self.MAX_WIDTH:
             pic_rate = self.MAX_WIDTH / pic_width
             img = cv2.resize(img, (self.MAX_WIDTH, int(pic_hight * pic_rate)), interpolation=cv2.INTER_LANCZOS4)
@@ -299,24 +305,26 @@ class CardPredictor:
         # cv2.imshow('original', img)
         # print("h,w:", pic_hight, pic_width)
         # pic_hight, pic_width = img.shape[:2]
-        print("h,w:", img.shape)
-
+        # print("h,w:", img.shape)
         if self.type == 2:
             self.card_imgs.append(img)
         else:
             blur = self.cfg["blur"]
             oldimg = img
+
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             # 高斯去噪
             if blur > 0:
                 img = cv2.GaussianBlur(img, (blur, blur), 0)  # 图片分辨率调整
             # 中值滤波
             median = cv2.medianBlur(img, 5)
+
             # cv2.imshow('gray', img)
             # 去掉图像中不会是车牌的区域
             kernel = np.ones((20, 20), np.uint8)
             img_opening = cv2.morphologyEx(median, cv2.MORPH_OPEN, kernel)
             img_opening = cv2.addWeighted(median, 1, img_opening, -1, 0)
+
             # cv2.imshow('addweight', img_opening)
             # for difficult
             if self.type:
@@ -334,7 +342,7 @@ class CardPredictor:
             img_edge1 = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
             # cv2.imshow('edge1', img_edge1)
             img_edge2 = cv2.morphologyEx(img_edge1, cv2.MORPH_OPEN, kernel)
-            cv2.imshow('edge2', img_edge2)
+            # cv2.imshow('edge2', img_edge2)
 
             # 查找图像边缘整体形成的矩形区域，可能有很多，车牌就在其中一个矩形区域中
             try:
@@ -342,9 +350,10 @@ class CardPredictor:
             except ValueError:
                 image, contours, hierarchy = cv2.findContours(img_edge2, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             contours = [cnt for cnt in contours if cv2.contourArea(cnt) > Min_Area]
-            print('len(contours)', len(contours))
+            # print('len(contours)', len(contours))
             # print(contours)
             # cv2.drawContours(oldimg, contours, 0, (0, 0, 255), 2)
+
             # 一一排除不是车牌的矩形区域
             car_contours = []
             old_img = oldimg.copy()
@@ -361,10 +370,10 @@ class CardPredictor:
                     box = cv2.boxPoints(rect)
                     box = np.int0(box)
                     old_img = cv2.drawContours(old_img, [box], 0, (0, 0, 255), 2)
-            cv2.imshow("edge4", old_img)
+            # cv2.imshow("edge4", old_img)
                 # cv2.waitKey(0)
 
-            print(len(car_contours))
+            # print(len(car_contours))
 
             print("精确定位")
             # self.card_imgs = []
@@ -403,7 +412,7 @@ class CardPredictor:
                     # print("pts1:", pts1, '\npts2:', pts2)
                     M = cv2.getAffineTransform(pts1, pts2)
                     dst = cv2.warpAffine(oldimg, M, (pic_width, pic_hight))
-                    cv2.imshow('dst+'+str(s), dst)
+                    # cv2.imshow('dst+'+str(s), dst)
                     point_limit(new_right_point)
                     point_limit(heigth_point)
                     point_limit(left_point)
@@ -420,7 +429,7 @@ class CardPredictor:
                     # print("pts1:", pts1, '\npts2:', pts2)
                     M = cv2.getAffineTransform(pts1, pts2)
                     dst = cv2.warpAffine(oldimg, M, (pic_width, pic_hight))
-                    cv2.imshow('dst-'+str(s), dst)
+                    # cv2.imshow('dst-'+str(s), dst)
                     point_limit(right_point)
                     point_limit(heigth_point)
                     point_limit(new_left_point)
@@ -460,7 +469,6 @@ class CardPredictor:
 
             row_num, col_num = card_img_hsv.shape[:2]
             card_img_count = row_num * col_num
-
             for i in range(row_num):
                 for j in range(col_num):
                     H = card_img_hsv.item(i, j, 0)
@@ -478,7 +486,6 @@ class CardPredictor:
                     elif 0 < H < 180 and 0 < S < 43 and 221 < V < 225:
                         white += 1
             color = "no"
-
             limit1 = limit2 = 0
             if yello * 2 >= card_img_count:
                 color = "yello"
@@ -507,7 +514,7 @@ class CardPredictor:
                 color = "bw"
             print('color is:', color)
             self.colors.append(color)
-            print('序号为:', t-1, blue, green, yello, black, white, card_img_count)
+            # print('序号为:', t-1, blue, green, yello, black, white, card_img_count)
             # cv2.imshow("color", card_img)
             # cv2.waitKey(0)
             if limit1 == 0:
@@ -533,26 +540,24 @@ class CardPredictor:
             if yh < 0: yh=0
             if xl < 0: xl=0
             if xr < 0: xr=0
+            # print('yes')
             self.card_imgs[card_index] = card_img[yl:yh, xl:xr] if color != "green" or yl < (yh - yl) // 4 else card_img[yl - (
                         yh - yl) // 4:yh, xl:xr]
             img_result_name = car_pic.split('.jpg', 1)[0] + '_result'
             self.card_num = car_pic.split('.jpg', 1)[0]
             # self.card_imgs_path[card_index]= img_result_name + '_' + str(card_index) + '.jpg'
             if color != "no":
-                # print(self.card_imgs[card_index])
-                # cv2.imshow("final_img"+str(t), self.card_imgs[card_index])
-                # cv2.imwrite('final_img'+str(t)+'.jpg', self.card_imgs[card_index])
                 cv2.imwrite(img_result_name+'.jpg', self.card_imgs[card_index])
         print('车牌定位结果保存到', img_result_name + '.jpg')
-        print('---------------------------------------------')
+        print('time_use_locate:', time.time() - t0)
+        # print('---------------------------------------------')
     # 以上为车牌定位
     # 以下为字符分割
     def split(self):
-        # 以下为识别车牌中的字符
-        print(len(self.colors), len(self.card_imgs), len(self.card_imgs_path))
+        self.part_cards = []
+        t1 = time.time()
         for i, color in enumerate(self.colors):
             if color in ("blue", "yello", "green"):
-                print('i:', i)
                 card_img = self.card_imgs[i]
                 # card_img_path = self.card_imgs_path[i]
                 print('---------------------------------------------')
@@ -563,7 +568,7 @@ class CardPredictor:
                     gray_img = cv2.bitwise_not(gray_img)
                 ret, gray_img = cv2.threshold(gray_img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-                cv2.imshow('split_thresh', gray_img)
+                # cv2.imshow('split_thresh', gray_img)
                 # 查找水平直方图波峰
                 x_histogram = np.sum(gray_img, axis=1)
                 x_min = np.min(x_histogram)
@@ -597,7 +602,7 @@ class CardPredictor:
 
                 wave = max(wave_peaks, key=lambda x: x[1] - x[0])
                 max_wave_dis = wave[1] - wave[0]
-                print("max_wave_dis:", max_wave_dis)
+                # print("max_wave_dis:", max_wave_dis)
                 # 判断是否是左侧车牌边缘
                 if wave_peaks[0][1] - wave_peaks[0][0] < max_wave_dis / 3 and wave_peaks[0][0] == 0:
                     wave_peaks.pop(0)
@@ -624,41 +629,28 @@ class CardPredictor:
                 if len(wave_peaks) <= 6:
                     print("peak less 2:", len(wave_peaks))
                     # continue
-                print("wave_peaks_after:", wave_peaks)
-                part_cards = seperate_card(gray_img_old, wave_peaks)
-                # imshow part
-                for i, part_card in enumerate(part_cards):
-                    self.part_cards.append(part_card)
-                    # w = part_card.shape[1] // 3
-                    # part_card = cv2.copyMakeBorder(part_card, 0, 0, w, w, cv2.BORDER_CONSTANT, value=[0, 0, 0])
-                    #
-                    # part_card = cv2.resize(part_card, (SZ, SZ), interpolation=cv2.INTER_AREA)
-                    # cv2.imshow("part_card_" + str(i), part_card)
-                    # # part_card = deskew(part_card)
-                    # part_card_name = self.card_num + '_part_' + str(i) + '.jpg'
-                    # cv2.imwrite(part_card_name, part_card)
+                # print("wave_peaks_after:", wave_peaks)
+                self.part_cards = seperate_card(gray_img_old, wave_peaks)
                 print('此车牌字符分割完成')
-                print('---------------------------------------------')
+                # print('---------------------------------------------')
+                print('time_use_split:', time.time()-t1)
                 break
     # 以下为字符识别
     def recognize(self):
+        self.predict_result = []
+        t2 = time.time()
         print('---------------------------------------------')
         print('车牌字符识别结果为:')
         for i, part_card in enumerate(self.part_cards):
-            # 可能是固定车牌的铆钉
-            # if np.mean(part_card) < 255 / 5:
-            #     print("a point")
-            #     continue
-            part_card_old = part_card
-            # w = abs(part_card.shape[1] - SZ)//2
             w = part_card.shape[1] // 3
             part_card = cv2.copyMakeBorder(part_card, 0, 0, w, w, cv2.BORDER_CONSTANT, value=[0, 0, 0])
             part_card = cv2.resize(part_card, (SZ, SZ), interpolation=cv2.INTER_AREA)
 
-            cv2.imshow("part_card_" + str(i), part_card)
+            # cv2.imshow("part_card_" + str(i), part_card)
             part_card = deskew(part_card)
-            part_card_name = self.card_num + '_part_' + str(i) + '.jpg'
-            cv2.imwrite(part_card_name, part_card)
+            # cv2.imshow("part_card_" + str(i), part_card)
+            # part_card_name = self.card_num + '_part_' + str(i) + '.jpg'
+            # cv2.imwrite(part_card_name, part_card)
 
             part_card = preprocess_hog([part_card])
             if i == 0:
@@ -667,13 +659,9 @@ class CardPredictor:
             else:
                 resp = self.model.predict(part_card)
                 charactor = chr(resp[0])
-            # 判断最后一个数是否是车牌边缘，假设车牌边缘被认为是1
-            # if charactor == "1" and i == len(self.part_cards) - 1:
-            #     if part_card_old.shape[0] / part_card_old.shape[1] >= 8:  # 1太细，认为是边缘
-            #         print(part_card_old.shape)
-            #         continue
-            print(charactor)
             self.predict_result.append(charactor)
+        print(self.predict_result)
+        print('time_use_recognize:', time.time() - t2)
 if __name__ == "__main__":
     # svm模型训练数据
     # carpredictor_svm = CardPredictor()
@@ -686,26 +674,46 @@ if __name__ == "__main__":
     carpredictor_difficult = CardPredictor(1)
     carpredictor_difficult.train_svm()
     # locate test
+    # 1-2: 6 and G(wrong) | 1-2: 1 and 2(wrong) | 1-2: 0(wrong) and D
+    # 3-1 and 3-3: 1 and 7(wrong) | 3-2: 6(wrong) and 5 | 3-3: 3 and J(wrong)
     # carpredictor.locate('./images/easy/2-3.jpg')
-    # carpredictor_easy.locate('./images/easy/1-1.jpg')
-    # carpredictor_easy.locate('./images/easy/1-2.jpg')
-    # carpredictor_easy.locate('./images/easy/1-3.jpg')
+    carpredictor_easy.locate('./images/easy/1-1.jpg')
+    carpredictor_easy.split()
+    carpredictor_easy.recognize()
+    carpredictor_easy.locate('./images/easy/1-2.jpg')
+    carpredictor_easy.split()
+    carpredictor_easy.recognize()
+    carpredictor_easy.locate('./images/easy/1-3.jpg')
+    carpredictor_easy.split()
+    carpredictor_easy.recognize()
     carpredictor_medium.locate('./images/medium/2-1.jpg')
-    # carpredictor_medium.locate('./images/medium/2-2.jpg')
-    # carpredictor_medium.locate('./images/medium/2-3.jpg')
-    # carpredictor_difficult.locate('./images/difficult/3-1.jpg')
-    # carpredictor_difficult.locate('./images/difficult/3-2.jpg')
-    # carpredictor_difficult.locate('./images/difficult/3-3.jpg')
+    carpredictor_medium.split()
+    carpredictor_medium.recognize()
+    carpredictor_medium.locate('./images/medium/2-2.jpg')
+    carpredictor_medium.split()
+    carpredictor_medium.recognize()
+    carpredictor_medium.locate('./images/medium/2-3.jpg')
+    carpredictor_medium.split()
+    carpredictor_medium.recognize()
+    carpredictor_difficult.locate('./images/difficult/3-1.jpg')
+    carpredictor_difficult.split()
+    carpredictor_difficult.recognize()
+    carpredictor_difficult.locate('./images/difficult/3-2.jpg')
+    carpredictor_difficult.split()
+    carpredictor_difficult.recognize()
+    carpredictor_difficult.locate('./images/difficult/3-3.jpg')
+    carpredictor_difficult.split()
+    carpredictor_difficult.recognize()
     # carpredictor.locate('./test/car4.jpg')
 
     # split test
     # carpredictor_easy.split()
-    carpredictor_medium.split()
+    # carpredictor_medium.split()
     # carpredictor_difficult.split()
 
     # recognize test
     # carpredictor_easy.recognize()
-    carpredictor_medium.recognize()
+    # carpredictor_medium.recognize()
     # carpredictor_difficult.recognize()
     while True:
         k = cv2.waitKey(1)
