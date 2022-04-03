@@ -313,6 +313,7 @@ class CardPredictor:
             oldimg = img
 
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            # cv2.imshow('gray', img)
             # 高斯去噪
             if blur > 0:
                 img = cv2.GaussianBlur(img, (blur, blur), 0)  # 图片分辨率调整
@@ -320,11 +321,12 @@ class CardPredictor:
             median = cv2.medianBlur(img, 5)
 
             # cv2.imshow('gray', img)
+            # cv2.imshow('median', median)
             # 去掉图像中不会是车牌的区域
             kernel = np.ones((20, 20), np.uint8)
             img_opening = cv2.morphologyEx(median, cv2.MORPH_OPEN, kernel)
+            # cv2.imshow('addweight_before', img_opening)
             img_opening = cv2.addWeighted(median, 1, img_opening, -1, 0)
-
             # cv2.imshow('addweight', img_opening)
             # for difficult
             if self.type:
@@ -350,9 +352,10 @@ class CardPredictor:
             except ValueError:
                 image, contours, hierarchy = cv2.findContours(img_edge2, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             contours = [cnt for cnt in contours if cv2.contourArea(cnt) > Min_Area]
-            # print('len(contours)', len(contours))
+            print('len(contours)', len(contours))
             # print(contours)
             # cv2.drawContours(oldimg, contours, 0, (0, 0, 255), 2)
+            # cv2.imshow('contours', oldimg)
 
             # 一一排除不是车牌的矩形区域
             car_contours = []
@@ -440,7 +443,7 @@ class CardPredictor:
                     # cv2.imshow("card"+'haha', card_img)
                     # cv2.waitKey(0)
                     self.card_imgs.append(card_img_)
-                # cv2.imshow("card"+str(i), card_img)
+                # cv2.imshow("card"+str(s), card_img)
                 # cv2.waitKey(0)
                 s+=1
         # 开始使用颜色定位，排除不是车牌的矩形，目前只识别蓝、绿、黄车牌
@@ -515,7 +518,9 @@ class CardPredictor:
             print('color is:', color)
             self.colors.append(color)
             # print('序号为:', t-1, blue, green, yello, black, white, card_img_count)
-            # cv2.imshow("color", card_img)
+            # show_card = card_img.copy()
+            # cv2.putText(show_card, color, (5,25), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
+            # cv2.imshow("color"+str(t), show_card)
             # cv2.waitKey(0)
             if limit1 == 0:
                 continue
@@ -547,7 +552,9 @@ class CardPredictor:
             self.card_num = car_pic.split('.jpg', 1)[0]
             # self.card_imgs_path[card_index]= img_result_name + '_' + str(card_index) + '.jpg'
             if color != "no":
+                # cv2.imshow('result', self.card_imgs[card_index])
                 cv2.imwrite(img_result_name+'.jpg', self.card_imgs[card_index])
+            t+=1
         print('车牌定位结果保存到', img_result_name + '.jpg')
         print('time_use_locate:', time.time() - t0)
         # print('---------------------------------------------')
@@ -575,6 +582,7 @@ class CardPredictor:
                 x_average = np.sum(x_histogram) / x_histogram.shape[0]
                 x_threshold = (x_min + x_average) / 2
                 wave_peaks = find_waves(x_threshold, x_histogram)
+                print("wave_peaks:", wave_peaks)
                 if len(wave_peaks) == 0:
                     print("peak less 0:")
                     # continue
@@ -592,7 +600,7 @@ class CardPredictor:
                 y_threshold = (y_min + y_average) / 2.8  # U和0要求阈值偏小，否则U和0会被分成两半
 
                 wave_peaks = find_waves(y_threshold, y_histogram)
-                # print("wave_peaks:", wave_peaks)
+                print("wave_peaks:", wave_peaks)
                 # for wave in wave_peaks:
                 #	cv2.line(card_img, pt1=(wave[0], 5), pt2=(wave[1], 5), color=(0, 0, 255), thickness=2)
                 # 车牌字符数应大于6
@@ -642,6 +650,7 @@ class CardPredictor:
         print('---------------------------------------------')
         print('车牌字符识别结果为:')
         for i, part_card in enumerate(self.part_cards):
+            # cv2.imshow("part_card_" + str(i), part_card)
             w = part_card.shape[1] // 3
             part_card = cv2.copyMakeBorder(part_card, 0, 0, w, w, cv2.BORDER_CONSTANT, value=[0, 0, 0])
             part_card = cv2.resize(part_card, (SZ, SZ), interpolation=cv2.INTER_AREA)
@@ -662,11 +671,10 @@ class CardPredictor:
             self.predict_result.append(charactor)
         print(self.predict_result)
         print('time_use_recognize:', time.time() - t2)
+
+
 if __name__ == "__main__":
     # svm模型训练数据
-    # carpredictor_svm = CardPredictor()
-    # carpredictor_svm.train_svm()
-
     carpredictor_easy = CardPredictor(2)
     carpredictor_easy.train_svm()
     carpredictor_medium = CardPredictor(0)
@@ -704,17 +712,7 @@ if __name__ == "__main__":
     carpredictor_difficult.locate('./images/difficult/3-3.jpg')
     carpredictor_difficult.split()
     carpredictor_difficult.recognize()
-    # carpredictor.locate('./test/car4.jpg')
 
-    # split test
-    # carpredictor_easy.split()
-    # carpredictor_medium.split()
-    # carpredictor_difficult.split()
-
-    # recognize test
-    # carpredictor_easy.recognize()
-    # carpredictor_medium.recognize()
-    # carpredictor_difficult.recognize()
     while True:
         k = cv2.waitKey(1)
         if k == ord('q'):

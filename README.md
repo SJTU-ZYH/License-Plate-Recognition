@@ -5,7 +5,8 @@ License Plate Recognition For Car With Python And OpenCV
 * 算法思想来自于网上资源，先使用图像边缘和车牌颜色定位车牌，根据直方图分割字符，最后拟用SVM再分类识别字符。  
 * 数据集来自 https://github.com/liuruoze/EasyPR/tree/master/resources/train, 并且自己做了部分数据增强。
 
-##### 额外说明：测试中发现，车牌定位算法的参数受图像分辨率、色偏、车距影响（其他图片很可能因为像素等问题识别不了，识别其他像素的车牌需要修改config文件里面的参数）。
+##### 额外说明：测试中发现，车牌定位算法的参数受图像分辨率、色偏、车距影响(其他图片很可能因为像素等问题识别不了，识别其他像素的车牌需要修改config文件里面的参数).
+##### SVM说明：如需要重新训练，请把原来的svm.dat和svmchinese.dat删除再运行predict_hang.py.
 ## 针对于大作业
 
 - ### 基于以下假设
